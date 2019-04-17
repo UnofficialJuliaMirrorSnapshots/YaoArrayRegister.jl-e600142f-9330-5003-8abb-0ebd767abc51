@@ -49,11 +49,16 @@ end
     @test nactive(reg) == 8
     @test reg0  == relax!(reg, 1:8) == relax!(reg)
 
-    reg1 = focus(copy(reg0), (5, 3, 2)) do reg
+    reg1 = focus!(copy(reg0), (5, 3, 2)) do reg
         @test nactive(reg) == 3
         reg
     end
 
     @test reg1 == reg0
     @test reg0 == copy(reg0) |> focus!(7,3,2) |> relax!(7,3,2)
+end
+
+@testset "partial trace" begin
+    r = cat(zero_state(1), ArrayReg(bit"011"))
+    partial_tr(r, 1) ≈ ArrayReg(bit"011")
 end
