@@ -34,7 +34,9 @@ end
     @test reg |> nactive == 3
     @test copy(reg) |> addbits!(2) |> nactive == 5
     reg2 = copy(reg) |> addbits!(2) |> focus!(4,5)
-    @test (reg2 |> measure_remove!; reg2) |> relax! ≈ reg
+    @test (reg2 |> measure_remove!; reg2) |> relax!(to_nactive=nqubits(reg2)) ≈ reg
+
+    @test insert_qubits!(copy(reg), 2; nqubits=2) |> nactive == 5
 end
 
 @testset "Focus 2" begin
@@ -47,7 +49,7 @@ end
     reg  = focus!(copy(reg0), 1:8)
     @test hypercubic(reg) == reshape(reg0.state, fill(2, 8)...,4)
     @test nactive(reg) == 8
-    @test reg0  == relax!(reg, 1:8) == relax!(reg)
+    @test reg0  == relax!(reg, 1:8)
 
     reg1 = focus!(copy(reg0), (5, 3, 2)) do reg
         @test nactive(reg) == 3
@@ -59,6 +61,6 @@ end
 end
 
 @testset "partial trace" begin
-    r = cat(zero_state(1), ArrayReg(bit"011"))
-    partial_tr(r, 1) ≈ ArrayReg(bit"011")
+    r = join(ArrayReg(bit"111"), zero_state(1))
+    partial_tr(r, 1) ≈ ArrayReg(bit"111")
 end

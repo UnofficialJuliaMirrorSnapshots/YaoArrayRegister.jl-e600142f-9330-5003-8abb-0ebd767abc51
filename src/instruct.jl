@@ -12,6 +12,32 @@ const Locations{T} = NTuple{N, T} where N
 const BitConfigs{T} = NTuple{N, T} where N
 
 function YaoBase.instruct!(
+    state::AbstractVecOrMat{T1},
+    operator::AbstractMatrix{T2},
+    locs::NTuple{M, Int},
+    control_locs::NTuple{C, Int}=(),
+    control_bits::NTuple{C, Int}=()) where {T1, T2, M, C}
+    
+    @warn "Element Type Mismatch: register $(T1), operator $(T2). Converting operator to match, this may cause performance issue"
+    return instruct!(state, copyto!(similar(operator, T1), operator), locs, control_locs, control_bits)
+end
+
+function YaoBase.instruct!(state::AbstractVecOrMat{T1}, U1::AbstractMatrix{T2}, loc::Int) where {T1, T2}
+    @warn "Element Type Mismatch: register $(T1), operator $(T2). Converting operator to match, this may cause performance issue"
+    return instruct!(state, copyto!(similar(U1, T1), U1), loc)
+end
+
+function YaoBase.instruct!(state::AbstractVecOrMat{T1}, U1::SDPermMatrix{T2}, loc::Int) where {T1, T2}
+    @warn "Element Type Mismatch: register $(T1), operator $(T2). Converting operator to match, this may cause performance issue"
+    return instruct!(state, copyto!(similar(U1, T1), U1), loc)
+end
+
+function YaoBase.instruct!(state::AbstractVecOrMat{T1}, U1::SDDiagonal{T2}, loc::Int) where {T1, T2}
+    @warn "Element Type Mismatch: register $(T1), operator $(T2). Converting operator to match, this may cause performance issue"
+    return instruct!(state, copyto!(similar(U1, T1), U1), loc)
+end
+
+function YaoBase.instruct!(
     state::AbstractVecOrMat{T},
     operator::AbstractMatrix{T},
     locs::NTuple{M, Int},
@@ -47,9 +73,10 @@ end
 
 YaoBase.instruct!(state::AbstractVecOrMat, U::IMatrix, locs::NTuple{N, Int}) where N = state
 YaoBase.instruct!(state::AbstractVecOrMat, U::IMatrix, locs::Int)  = state
+YaoBase.instruct!(state::AbstractVecOrMat, U::IMatrix, locs::Tuple{Int}) = state
 
 # one-qubit instruction
-YaoBase.instruct!(state::AbstractVecOrMat{T}, g::AbstractMatrix{T}, locs::Tuple{Int}) where T =
+YaoBase.instruct!(state::AbstractVecOrMat, g::AbstractMatrix, locs::Tuple{Int}) =
     instruct!(state, g, locs...)
 
 function YaoBase.instruct!(state::AbstractVecOrMat{T}, U1::AbstractMatrix{T}, loc::Int) where T

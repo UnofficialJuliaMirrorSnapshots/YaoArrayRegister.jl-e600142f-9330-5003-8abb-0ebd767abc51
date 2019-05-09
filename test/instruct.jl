@@ -30,6 +30,14 @@ using YaoBase.Const
     @test instruct!(copy(ST), I2, (1, )) ≈ ST
 end
 
+@testset "test auto conversion" begin
+    v = rand(ComplexF32, 1<<8)
+    @test_logs (:warn,"Element Type Mismatch: register Complex{Float32}, operator Complex{Float64}. Converting operator to match, this may cause performance issue") instruct!(v, Const.Pd, (1, ))
+    @test_logs (:warn,"Element Type Mismatch: register Complex{Float32}, operator Complex{Float64}. Converting operator to match, this may cause performance issue") instruct!(v, Const.Pd, 1)
+    @test_logs (:warn,"Element Type Mismatch: register Complex{Float32}, operator Complex{Float64}. Converting operator to match, this may cause performance issue") instruct!(v, Const.Z, 1)
+    @test_logs (:warn,"Element Type Mismatch: register Complex{Float32}, operator Complex{Float64}. Converting operator to match, this may cause performance issue") instruct!(v, Const.X, 1)
+end
+
 
 @testset "test general control unitary operator" begin
     ST = randn(ComplexF64, 1<<5)
@@ -81,4 +89,9 @@ end
 @testset "swap instruction" begin
     ST = randn(ComplexF64, 1 << 2)
     @test instruct!(copy(ST), Val(:SWAP), (1, 2)) ≈ SWAP * ST
+end
+
+@testset "Yao.jl/#189" begin
+    st = rand(1<<4)
+    @test instruct!(st, IMatrix{2, Float64}(), 1) == st
 end

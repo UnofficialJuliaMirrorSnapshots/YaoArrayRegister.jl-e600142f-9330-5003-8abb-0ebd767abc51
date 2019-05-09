@@ -4,7 +4,7 @@ using Test, YaoArrayRegister, BitBasis, LinearAlgebra
     @test ArrayReg{3}(rand(4, 6)) isa ArrayReg{3}
     @test_throws DimensionMismatch ArrayReg{2}(rand(4, 3))
     @test_throws DimensionMismatch ArrayReg{2}(rand(5, 2))
-    @test_throws MethodError ArrayReg(rand(4, 3))
+    @test_logs (:warn, "Input type of `ArrayReg` is not Complex, got Float64") ArrayReg(rand(4, 3))
 
     @test ArrayReg(rand(ComplexF64, 4, 3)) isa ArrayReg{3}
     @test ArrayReg(rand(ComplexF64, 4)) isa ArrayReg{1}
@@ -83,9 +83,9 @@ end
     @testset "test addbits!" begin
         @test addbits!(zero_state(3), 3) == zero_state(6)
         r = rand_state(3; nbatch=2)
-        @test addbits!(copy(r), 2) ≈ cat(r, zero_state(2; nbatch=2))
+        @test addbits!(copy(r), 2) ≈ join(zero_state(2; nbatch=2), r)
         r = rand_state(3; nbatch=1)
-        @test addbits!(copy(r), 2) ≈ cat(r, zero_state(2; nbatch=1))
+        @test addbits!(copy(r), 2) ≈ join(zero_state(2; nbatch=1), r)
     end
 end
 
@@ -101,18 +101,26 @@ end
 end
 
 # TODO: test concat multiple registers
-@testset "test cat" begin
+@testset "test join" begin
     r1 = rand_state(6)
     r2 = rand_state(6)
-    r3 = cat(r1, r2)
-    r4 = cat(focus!(copy(r1), 1:3), focus!(copy(r2), 1:2))
+    r3 = join(r2, r1)
+    r4 = join(focus!(copy(r2), 1:2), focus!(copy(r1), 1:3))
     @test r4 |> relaxedvec ≈ focus!(copy(r3), [1,2,3,7,8,4,5,6,9,10,11,12]) |> relaxedvec
     reg5 = focus!(repeat(r1, 3), 1:3)
     reg6 = focus!(repeat(r2, 3), 1:2)
-    @test (cat(reg5, reg6) |> relaxedvec)[:,1] ≈ r4 |> relaxedvec
+    @test (join(reg6, reg5) |> relaxedvec)[:,1] ≈ r4 |> relaxedvec
 
     # manual trace
-    r = cat(zero_state(1), ArrayReg(bit"011"))
+    r = join(ArrayReg(bit"011"), zero_state(1))
     focus!(r, 2:4)
     @test sum(r.state, dims=2) ≈ ArrayReg(bit"011").state
+end
+
+@testset "YaoBlocks.jl/issues/21" begin
+    st = rand(ComplexF64, 16, 2)
+    r1 = ArrayReg(view(st, :, 1))
+    r2 = ArrayReg(rand(ComplexF64, 16, 1))
+    copyto!(r1, r2)
+    @test r1 == r2
 end

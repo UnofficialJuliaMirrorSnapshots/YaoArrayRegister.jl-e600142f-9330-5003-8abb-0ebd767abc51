@@ -11,6 +11,7 @@ export ArrayReg,
     nbatch,
     viewbatch,
     addbits!,
+    insert_qubits!,
     datatype,
     probs,
     reorder!,
@@ -72,9 +73,13 @@ function ArrayReg{B}(raw::MT) where {B, T, MT <: AbstractMatrix{T}}
     return ArrayReg{B, T, MT}(raw)
 end
 
-ArrayReg(raw::AbstractVector{<:Complex}) = ArrayReg(reshape(raw, :, 1))
-ArrayReg(raw::AbstractMatrix{<:Complex}) = ArrayReg{size(raw, 2)}(raw)
-ArrayReg(raw::AbstractArray{<:Complex, 3}) = ArrayReg{size(raw, 3)}(reshape(raw, size(raw, 1), :))
+function _warn_type(raw::AbstractArray{T}) where T
+    T <: Complex || @warn "Input type of `ArrayReg` is not Complex, got $(eltype(raw))"
+end
+
+ArrayReg(raw::AbstractVector) = (_warn_type(raw); ArrayReg(reshape(raw, :, 1)))
+ArrayReg(raw::AbstractMatrix) = (_warn_type(raw); ArrayReg{size(raw, 2)}(raw))
+ArrayReg(raw::AbstractArray{<:Any, 3}) = (_warn_type(raw); ArrayReg{size(raw, 3)}(reshape(raw, size(raw, 1), :)))
 
 # bit literal
 # NOTE: batch size B and element type T are 1 and ComplexF64 by default
@@ -114,7 +119,13 @@ ArrayReg(r::ArrayReg{B}) where B = ArrayReg{B}(copy(r.state))
 Base.copy(r::ArrayReg) = ArrayReg(r)
 Base.similar(r::ArrayRegOrAdjointArrayReg{B}) where B = ArrayReg{B}(similar(state(r)))
 
-function Base.copyto!(dst::R, src::R) where {R <: ArrayRegOrAdjointArrayReg}
+# NOTE: ket bra is not copyable
+function Base.copyto!(dst::ArrayReg, src::ArrayReg)
+    copyto!(state(dst), state(src))
+    return dst
+end
+
+function Base.copyto!(dst::AdjointArrayReg, src::AdjointArrayReg)
     copyto!(state(dst), state(src))
     return dst
 end
@@ -130,6 +141,14 @@ function YaoBase.addbits!(r::ArrayReg, n::Int)
     fill!(r.state, 0)
     r.state[1:M, :] = raw
     return r
+end
+
+function YaoBase.insert_qubits!(reg::ArrayReg{B}, loc::Int; nqubits::Int=1) where B
+    na = nactive(reg)
+    focus!(reg, 1:loc-1)
+    reg2 = join(zero_state(nqubits; nbatch=B), reg) |> relax! |> focus!((1:na+nqubits)...)
+    reg.state = reg2.state
+    reg
 end
 
 function YaoBase.probs(r::ArrayReg{1})
@@ -228,23 +247,23 @@ See also [`rank3`](@ref).
 rank3(r::ArrayRegOrAdjointArrayReg{B}) where B = reshape(state(r), size(state(r), 1), :, B)
 
 """
-    cat(regs...)
+    join(regs...)
 
 concat a list of registers `regs` to a larger register, each register should
 have the same batch size. See also [`repeat`](@ref).
 """
-Base.cat(rs::ArrayReg{B}...) where B = _cat(cat_datatype(reverse(rs)...), reverse(rs)...)
-Base.cat(r::ArrayReg) = r
+Base.join(rs::ArrayReg{B}...) where B = _join(join_datatype(rs...), rs...)
+Base.join(r::ArrayReg) = r
 
-function _cat(::Type{T}, rs::ArrayReg{B}...) where {T, B}
+function _join(::Type{T}, rs::ArrayReg{B}...) where {T, B}
     state = batched_kron(rank3.(rs)...)
     return ArrayReg{B}(reshape(state, size(state, 1), :))
 end
 
-cat_datatype(r::ArrayReg{B, T}, rs::ArrayReg{B}...) where {B, T} = cat_datatype(T, r, rs...)
-cat_datatype(::Type{T}, r::ArrayReg{B, T1}, rs::ArrayReg{B}...) where {T, T1, B} =
-    cat_datatype(promote_type(T, T1), rs...)
-cat_datatype(::Type{T}) where T = T
+join_datatype(r::ArrayReg{B, T}, rs::ArrayReg{B}...) where {B, T} = join_datatype(T, r, rs...)
+join_datatype(::Type{T}, r::ArrayReg{B, T1}, rs::ArrayReg{B}...) where {T, T1, B} =
+    join_datatype(promote_type(T, T1), rs...)
+join_datatype(::Type{T}) where T = T
 
 
 # initialization methods
